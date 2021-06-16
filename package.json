@@ -1,0 +1,27 @@
+{
+  "name": "maple-tools",
+  "version": "0.1.0",
+  "description": "Various Maple Tools",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maple-labs/maple-tools.git"
+  },
+  "author": "Maple Finance",
+  "license": "AGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/maple-labs/maple-tools/issues"
+  },
+  "homepage": "https://github.com/maple-labs/maple-tools#readme",
+  "private": false,
+  "scripts": {
+    "prettier": "prettier --write ./src"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.7",
+    "minimist": "^1.2.5"
+  },
+  "devDependencies": {
+    "prettier": "^2.3.1"
+  }
+}

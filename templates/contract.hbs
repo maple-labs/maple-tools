@@ -1,0 +1,99 @@
+# {{contractName}}
+
+{{#if description}} {{description}}{{/if}}
+
+{{#if constructor}}
+## Constructor
+
+{{#constructor}}
+
+{{#if description}}{{description}}{{/if}}
+
+```solidity
+  constructor(
+    {{#inputs}}
+    {{type}}{{#if name}} {{name}}{{/if}}{{#if @last}}{{else}},{{/if}}
+    {{/inputs}}
+  )
+```
+
+{{#if inputs}}
+#### Parameters:
+| Index | Name | Type | Internal Type | Description |
+| :---- | :--- | :--- | :------------ | :---------- |
+{{#inputs}}
+| {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
+{{/inputs}}
+{{/if}}
+
+{{/constructor}}
+
+{{/if}}
+
+{{#if functions.length}}
+## Functions
+{{/if}}
+
+{{#functions}}
+### {{name}} {{#if isStateVariable}}(state variable){{/if}}
+
+{{#if description}}{{description}}{{/if}}
+
+```solidity
+  function {{name}}(
+    {{#inputs}}
+    {{type}}{{#if name}} {{name}}{{/if}}{{#if @last}}{{else}},{{/if}}
+    {{/inputs}}
+  ) {{stateMutability}}{{#if outputs}} returns (
+    {{#outputs}}
+    {{type}}{{#if name}} {{name}}{{/if}}{{#if @last}}{{else}},{{/if}}
+    {{/outputs}}
+  ){{/if}}
+```
+
+{{#if inputs}}
+#### Parameters:
+| Index | Name | Type | Internal Type | Description |
+| :---- | :--- | :--- | :------------ | :---------- |
+{{#inputs}}
+| {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
+{{/inputs}}
+{{/if}}
+
+{{#if outputs}}
+#### Return Values:
+| Index | Name | Type | Description |
+| :---- | :--- | :--- | :---------- |
+{{#outputs}}
+| {{@index}} | {{#if name}}`{{name}}`{{/if}} | `{{type}}` | {{ description }}
+{{/outputs}}
+{{/if}}
+
+{{/functions}}
+
+{{#if events.length}}
+## Events
+{{/if}}
+
+{{#events}}
+### {{name}}
+
+{{#if description}}{{description}}{{/if}}
+```solidity
+  event {{name}}(
+    {{#inputs}}
+    {{type}} {{name}}{{#if @last}}{{else}},{{/if}}
+    {{/inputs}}
+  )
+```
+
+{{#if inputs}}
+#### Parameters:
+| Index | Name | Type | Internal Type | Description |
+| :---- | :--- | :--- | :------------ | :---------- |
+{{#inputs}}
+| {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
+{{/inputs}}
+{{/if}}
+
+{{/events}}
