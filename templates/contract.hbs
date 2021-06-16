@@ -1,6 +1,6 @@
 # {{contractName}}
 
-{{#if description}} {{description}}{{/if}}
+{{#if description}}{{description}}{{/if}}
 
 {{#if constructor}}
 ## Constructor
@@ -20,7 +20,7 @@
 {{#if inputs}}
 #### Parameters:
 | Index | Name | Type | Internal Type | Description |
-| :---- | :--- | :--- | :------------ | :---------- |
+| :---: | :--: | :--: | :-----------: | :---------- |
 {{#inputs}}
 | {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
 {{/inputs}}
@@ -54,19 +54,21 @@
 {{#if inputs}}
 #### Parameters:
 | Index | Name | Type | Internal Type | Description |
-| :---- | :--- | :--- | :------------ | :---------- |
+| :---: | :--: | :--: | :-----------: | :---------- |
 {{#inputs}}
 | {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
 {{/inputs}}
 {{/if}}
 
 {{#if outputs}}
+
 #### Return Values:
 | Index | Name | Type | Description |
-| :---- | :--- | :--- | :---------- |
+| :---: | :--: | :--: | :---------- |
 {{#outputs}}
 | {{@index}} | {{#if name}}`{{name}}`{{/if}} | `{{type}}` | {{ description }}
 {{/outputs}}
+
 {{/if}}
 
 {{/functions}}
@@ -90,7 +92,7 @@
 {{#if inputs}}
 #### Parameters:
 | Index | Name | Type | Internal Type | Description |
-| :---- | :--- | :--- | :------------ | :---------- |
+| :---: | :--: | :--: | :-----------: | :---------- |
 {{#inputs}}
 | {{@index}} | `{{name}}` | `{{type}}` | `{{internalType}}` | {{ description }}
 {{/inputs}}
