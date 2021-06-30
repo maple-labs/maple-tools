@@ -63,10 +63,10 @@
 {{#if outputs}}
 
 #### Return Values:
-| Index | Name | Type | Description |
-| :---: | :--: | :--: | :---------- |
+| Index | Name | Type | Internal Type | Description |
+| :---: | :--: | :--: | :-----------: | :---------- |
 {{#outputs}}
-| {{@index}} | {{#if name}}`{{name}}`{{/if}} | `{{type}}` | {{ description }}
+| {{@index}} | {{#if name}}`{{name}}`{{/if}} | `{{type}}` | `{{internalType}}` | {{ description }}
 {{/outputs}}
 
 {{/if}}
