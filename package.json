@@ -15,9 +15,14 @@
   "homepage": "https://github.com/maple-labs/maple-tools#readme",
   "private": false,
   "scripts": {
-    "prettier": "prettier --write ./src"
+    "prettier": "prettier --write ./src",
+    "calc:airdrop": "yarn run calculate-airdrop"
   },
   "dependencies": {
+    "csvtojson": "^2.0.10",
+    "dotenv": "^10.0.0",
+    "ethers": "^5.4.1",
+    "fast-csv": "^4.3.6",
     "handlebars": "^4.7.7",
     "minimist": "^1.2.5"
   },
