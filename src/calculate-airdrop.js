@@ -21,7 +21,7 @@ const GOVERNOR = '0xd6d4Bcde6c816F17889f1Dd3000aF0261B03a196';
 
 const mpl = new Contract(MPL, mplAbi, provider);
 
-// Derived from: 2 MPL / 100 USD / 180 days == x MPL / totalStaked / dTime
+// Derived from: 2 MPL / 100 USD / 180 days == x MPL / totalStaked / dTime 
 // Note: Units work out since totalStaked is denominated in WAD
 const getTheoreticalRewards = (totalStaked, dTime) => {
     return BigNumber.from('2')
@@ -31,10 +31,23 @@ const getTheoreticalRewards = (totalStaked, dTime) => {
         .div(BigNumber.from((180 * 86400).toString()));
 };
 
+function addAddressInInput(array, address, i) {
+    const found = array.some(element => element.address === address);
+    if (!found) array.push({ name: `DeFi User ${i}`, address });
+    return array;
+  }
+
 const calcAirdrop = async (inputFilename, outputFilename, rewardsAddress, airdropTransferAddress, currentTimestamp) => {
-    const inputData = await csvToJson().fromFile(path.resolve(__dirname, 'csv', inputFilename));
+    let inputData = await csvToJson().fromFile(path.resolve(__dirname, 'csv', inputFilename));
 
     const rewardsContract = new Contract(rewardsAddress, rewardsAbi, provider);
+
+    // Get all stake events for all users for the given rewardsContract
+    const allStakeFilter = rewardsContract.filters.RewardPaid();
+    const allStakeEvents = await rewardsContract.queryFilter(allStakeFilter);
+    const allAddresses = [...new Set(allStakeEvents.map(obj => obj.args.account))];  // Get all addresses and remove duplicates
+
+    for (let i = 0; i < allAddresses.length - 1; i++) addAddressInInput(inputData, allAddresses[i], i)
 
     let outputData = await Promise.all(
         inputData.map(async (user) => {
@@ -77,6 +90,8 @@ const calcAirdrop = async (inputFilename, outputFilename, rewardsAddress, airdro
             };
         })
     );
+
+    // console.log({outputData})
 
     // Save to file
     const csv = new ObjectsToCsv(outputData);
