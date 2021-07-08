@@ -31,6 +31,7 @@ const getTheoreticalRewards = (totalStaked, dTime) => {
         .div(BigNumber.from((180 * 86400).toString()));
 };
 
+// If address exists in inputData, skip if not add and label
 function addAddressInInput(array, address, i) {
     const found = array.some(element => element.address === address);
     if (!found) array.push({ name: `DeFi User ${i}`, address });
@@ -47,7 +48,7 @@ const calcAirdrop = async (inputFilename, outputFilename, rewardsAddress, airdro
     const allStakeEvents = await rewardsContract.queryFilter(allStakeFilter);
     const allAddresses = [...new Set(allStakeEvents.map(obj => obj.args.account))];  // Get all addresses and remove duplicates
 
-    for (let i = 0; i < allAddresses.length - 1; i++) addAddressInInput(inputData, allAddresses[i], i)
+    for (let i = 0; i < allAddresses.length; i++) addAddressInInput(inputData, allAddresses[i], i)
 
     let outputData = await Promise.all(
         inputData.map(async (user) => {
@@ -69,12 +70,22 @@ const calcAirdrop = async (inputFilename, outputFilename, rewardsAddress, airdro
             const earnings = (await rewardsContract.functions.earned(user.address))[0];
 
             // Get all stake events and amounts to use for theoretical MPL amount calculation
+            // If user stakes multiple times, calculate theoretical MPL for each dTime
             const stakeFilter = rewardsContract.filters.Staked(user.address);
             const stakeEvents = await rewardsContract.queryFilter(stakeFilter);
-            const totalTheoreticalRewards = await stakeEvents.reduce(async (total, obj, i, []) => {
-                const { timestamp: stakeTimestamp } = await provider.getBlock(obj.blockNumber);
-                return (await total).add(getTheoreticalRewards(obj.args.amount, currentTimestamp - stakeTimestamp));
-            }, BigNumber.from('0'));
+            let lastStakeTimestamp = 0;
+            let totalTheoreticalRewards = BigNumber.from('0');
+            for(let i = stakeEvents.length - 1; i >= 0; i--) {
+                const { timestamp: stakeTimestamp } = await provider.getBlock(stakeEvents[i].blockNumber);
+                const endTimestamp = lastStakeTimestamp == 0 ? currentTimestamp : lastStakeTimestamp;
+                totalTheoreticalRewards = totalTheoreticalRewards.add(getTheoreticalRewards(stakeEvents[i].args.amount, endTimestamp - stakeTimestamp));
+                lastStakeTimestamp = stakeTimestamp;
+            }
+
+            // const totalTheoreticalRewards = await stakeEvents.reduce(async (total, obj, i, []) => {
+            //     const { timestamp: stakeTimestamp } = await provider.getBlock(obj.blockNumber);
+            //     return (await total).add(getTheoreticalRewards(obj.args.amount, currentTimestamp - stakeTimestamp));
+            // }, BigNumber.from('0'));
 
             const rewardsOwed = totalTheoreticalRewards.sub(totalClaimed).sub(totalAirdropped).sub(earnings);
 
@@ -91,7 +102,7 @@ const calcAirdrop = async (inputFilename, outputFilename, rewardsAddress, airdro
         })
     );
 
-    // console.log({outputData})
+    console.log({outputData})
 
     // Save to file
     const csv = new ObjectsToCsv(outputData);
