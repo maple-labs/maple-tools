@@ -19,7 +19,7 @@ const spliceOut = (code, index, length) => code.slice(0, index) + code.slice(ind
 const spliceOutSwarm = (code) => spliceOut(code, code.length - 86, 64);
 const spliceOutAddress = (code) => spliceOut(code, 2, 40);
 
-const normalizeDeployedBytecode = (code) => spliceOutSwarm(code.startsWith('73') ? spliceOutAddress(code) : code);
+const normalizeDeployedBytecode = (code) => code.startsWith('73') ? spliceOutAddress(code) : code;
 
 const stripLibRefs = (code, index = code.indexOf('__$')) => (index >= 0 ? stripLibRefs(spliceOut(code, index, 40)) : code);
 
@@ -30,19 +30,22 @@ const metadata = contractPaths.map((path) => {
     const { sources } = JSON.parse(contracts[path][contractName].metadata);
     const { keccak256: sourceHash } = sources[path];
     const { deployedBytecode } = contracts[path][contractName].evm;
-    const contractSize = deployedBytecode.object.length / 2;
-    const normalizedDeployedBytecode = normalizeDeployedBytecode(deployedBytecode.object);
+    const { object: rawBytecode } = deployedBytecode;
+
+    const contractSize = rawBytecode.length / 2;
+    const normalizedDeployedBytecode = normalizeDeployedBytecode(rawBytecode);
     const bytecodeHashWithLibRefs = hash(normalizedDeployedBytecode);
     const bytecodeHashWithoutLibRefs = hash(stripLibRefs(normalizedDeployedBytecode));
 
-    return {
+    const details = {
         contractName,
         contractSize,
         sourceHash,
         bytecodeHashWithLibRefs,
         bytecodeHashWithoutLibRefs,
-        rawBytecode: deployedBytecode.object,
     };
+
+    return args['r'] ? Object.assign(details, { rawBytecode }) : details;
 });
 
 metadata.sort(({ contractName: contractNameA }, { contractName: contractNameB }) => contractNameA.localeCompare(contractNameB));
