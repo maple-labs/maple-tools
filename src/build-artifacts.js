@@ -1,17 +1,9 @@
 const fs = require('fs');
+const fsExtra = require('fs-extra');
 const assert = require('assert');
 const path = require('path');
 
 const isSet = (arg) => typeof arg === 'string' || typeof arg === 'number';
-
-const args = require('minimist')(process.argv.slice(2));
-assert(isSet(args['in']), 'Build Input File (--in).');
-assert(isSet(args['out']), 'Artifacts Output Directory (--out).');
-
-const { contracts } = require(path.join(process.cwd(), args['in']));
-
-const ignorePaths = ['/test/', '/external-interfaces/', 'lib/', 'module/'];
-const pathIgnored = (path) => ignorePaths.reduce((ignore, ignorePath) => path.includes(ignorePath) || ignore, false);
 
 const getDetailedAbiUnit = (abiUnit, devdocUnit = {}, stateVariableUnit) => {
     const enrichedAbiUnit = {
@@ -90,61 +82,71 @@ const updateMetadataAbi = (metadata, abi) => {
 
     const currentMetadata = JSON.parse(metadata);
     Object.assign(currentMetadata.output, { abi });
+
     return JSON.stringify(currentMetadata, null, '');
 };
 
-const merge = (contractPair) => {
-    const { contract = {}, interface = {} } = contractPair;
+const merge = (contractGroup) => {
+    const { contract = {}, interface = {} } = contractGroup;
     const { abi: contractAbi = [], devdoc: contractDevdoc = {}, metadata: contractMetadata } = contract;
     const { abi: interfaceAbi = [], devdoc: interfaceDevdoc = {}, metadata: interfaceMetadata } = interface;
 
-    const mergedABi = contractAbi
-        .concat(interfaceAbi)
+    const mergedABi = interfaceAbi
+        .concat(contractAbi)
         .filter(({ name: a }, index, array) => array.findIndex(({ name: b }) => a === b) === index);
 
     const enrichedAbi = mergedABi.map((abiUnit) =>
         getDetailedAbiUnit(
-            getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, contractDevdoc), findStateVariableUnit(abiUnit, contractDevdoc)),
-            findDevdocUnit(abiUnit, interfaceDevdoc),
-            findStateVariableUnit(abiUnit, interfaceDevdoc)
+            getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, interfaceDevdoc), findStateVariableUnit(abiUnit, interfaceDevdoc)),
+            findDevdocUnit(abiUnit, contractDevdoc),
+            findStateVariableUnit(abiUnit, contractDevdoc)
         )
     );
 
     return contractAbi.length
-        ? Object.assign({}, contractPair.contract, {
+        ? Object.assign({}, contractGroup.contract, {
               abi: enrichedAbi,
               metadata: updateMetadataAbi(contractMetadata, enrichedAbi),
           })
-        : Object.assign({}, contractPair.interface, {
+        : Object.assign({}, contractGroup.interface, {
               abi: enrichedAbi,
               metadata: updateMetadataAbi(interfaceMetadata, enrichedAbi),
           });
 };
 
-const contractPaths = Object.keys(contracts).filter((path) => !pathIgnored(path));
+module.exports = (args) => {
+    assert(isSet(args['in']), 'Build Input File (--in).');
+    assert(isSet(args['out']), 'Artifacts Output Directory (--out).');
 
-const contractPairs = contractPaths.sort().reduce((contractPairs, path) => {
-    const name = Object.keys(contracts[path])[0];
+    const { contracts } = require(path.join(process.cwd(), args['in']));
 
-    const isInterface = name.startsWith('I');
-    const contractName = isInterface ? name.slice(1) : name;
+    const contractNameFilter = [].concat(args['filter'] ?? []);
+    const ignorePaths = ['/test/', '/external-interfaces/', 'lib/', 'module/'];
 
-    if (!contractPairs[contractName]) {
-        contractPairs[contractName] = {};
-    }
+    const pathIgnored = (path) => ignorePaths.reduce((ignore, ignorePath) => path.includes(ignorePath) || ignore, false);
 
-    isInterface
-        ? (contractPairs[contractName].interface = contracts[path][name])
-        : (contractPairs[contractName].contract = contracts[path][name]);
+    const contractGroups = {};
 
-    return contractPairs;
-}, {});
+    Object.keys(contracts).filter((path) => !pathIgnored(path)).sort().forEach((path, index, paths) => {
+        const name = Object.keys(contracts[path])[0];
 
-Object.keys(contractPairs).forEach((contractName) => {
-    const mergedArtifact = merge(contractPairs[contractName]);
+        contractGroups[name] = {
+            contract: contracts[path][name],
+            interface: contracts[paths.find(path => Object.keys(contracts[path])[0] === `I${name}`)]?.[`I${name}`]
+        };
 
-    fs.writeFileSync(
-        path.join(process.cwd(), args['out'], `${contractName}.json`),
-        JSON.stringify(mergedArtifact, null, '  ').concat('\n')
-    );
-});
+        return contractGroups;
+    }, {});
+
+    const outputDirectory = path.join(process.cwd(), args['out']);
+
+    fsExtra.emptyDirSync(outputDirectory);
+
+    Object.keys(contractGroups).forEach((contractName) => {
+        if (contractNameFilter.length > 0 && !contractNameFilter.includes(contractName)) return;
+
+        const mergedArtifact = merge(contractGroups[contractName]);
+
+        fs.writeFileSync(path.join(outputDirectory, `${contractName}.json`), JSON.stringify(mergedArtifact, null, '    ').concat('\n'));
+    });
+};
