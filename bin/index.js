@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const buildArtifacts = require('../src/build-artifacts');
+const mergeAbi = require('../src/merge-abi');
 const buildDocs = require('../src/build-docs');
 const buildMetaData = require('../src/build-metadata');
 const buildStandardJson = require('../src/build-standard-json');
@@ -8,7 +8,7 @@ const buildStandardJson = require('../src/build-standard-json');
 const args = require('minimist')(process.argv.slice(3));
 const mode = process.argv[2];
 
-if (mode == 'build-artifacts') return buildArtifacts(args);
+if (mode == 'merge-abi') return mergeAbi(args);
 
 if (mode == 'build-docs') return buildDocs(args);
 

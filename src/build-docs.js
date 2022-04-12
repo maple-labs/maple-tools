@@ -11,11 +11,12 @@ const extractTitle = (metadata) => (metadata ? JSON.parse(metadata)?.output?.dev
 module.exports = (args) => {
     assert(isSet(args['in']), 'Artifacts Input Directory (--in).');
     assert(isSet(args['out']), 'Docs Output Directory (--out).');
-    assert(isSet(args['templates']), 'Templates Directory (--templates).');
 
-    const contractTemplate = fs.readFileSync(path.join(process.cwd(), args['templates'], 'contract.hbs'), {
-        encoding: 'utf8',
-    });
+    const templatePath = isSet(args['templates'])
+        ? path.join(process.cwd(), args['templates'], 'contract.hbs')
+        : './templates/contract.hbs'
+
+    const contractTemplate = fs.readFileSync(templatePath, { encoding: 'utf8' });
 
     const buildContractDoc = handlebars.compile(contractTemplate);
 

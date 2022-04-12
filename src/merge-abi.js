@@ -77,57 +77,38 @@ const findStateVariableUnit = (abiUnit, devdoc = {}) => {
     return devdoc?.stateVariables?.[abiUnit.name];
 };
 
-const updateMetadataAbi = (metadata, abi) => {
-    if (!metadata) return metadata;
-
-    const currentMetadata = JSON.parse(metadata);
-    Object.assign(currentMetadata.output, { abi });
-
-    return JSON.stringify(currentMetadata, null, '');
-};
-
-const merge = (contractGroup) => {
+const merge = (artifact, contractGroup) => {
     const { contract = {}, interface = {} } = contractGroup;
-    const { abi: contractAbi = [], devdoc: contractDevdoc = {}, metadata: contractMetadata } = contract;
-    const { abi: interfaceAbi = [], devdoc: interfaceDevdoc = {}, metadata: interfaceMetadata } = interface;
+    const { abi: contractAbi = [], devdoc: contractDevdoc = {} } = contract;
+    const { abi: interfaceAbi = [], devdoc: interfaceDevdoc = {} } = interface;
 
-    const mergedABi = interfaceAbi
+    artifact.abi = artifact.abi
+        .concat(interfaceAbi)
         .concat(contractAbi)
-        .filter(({ name: a }, index, array) => array.findIndex(({ name: b }) => a === b) === index);
-
-    const enrichedAbi = mergedABi.map((abiUnit) =>
-        getDetailedAbiUnit(
-            getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, interfaceDevdoc), findStateVariableUnit(abiUnit, interfaceDevdoc)),
-            findDevdocUnit(abiUnit, contractDevdoc),
-            findStateVariableUnit(abiUnit, contractDevdoc)
-        )
-    );
-
-    return contractAbi.length
-        ? Object.assign({}, contractGroup.contract, {
-              abi: enrichedAbi,
-              metadata: updateMetadataAbi(contractMetadata, enrichedAbi),
-          })
-        : Object.assign({}, contractGroup.interface, {
-              abi: enrichedAbi,
-              metadata: updateMetadataAbi(interfaceMetadata, enrichedAbi),
-          });
+        .filter(({ name: a }, index, array) => array.findIndex(({ name: b }) => a === b) === index)
+        .map((abiUnit) =>
+            getDetailedAbiUnit(
+                getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, interfaceDevdoc), findStateVariableUnit(abiUnit, interfaceDevdoc)),
+                findDevdocUnit(abiUnit, contractDevdoc),
+                findStateVariableUnit(abiUnit, contractDevdoc)
+            )
+        );
 };
 
 module.exports = (args) => {
+    assert(isSet(args['name']), 'Contract Name (--name).');
     assert(isSet(args['in']), 'Build Input File (--in).');
     assert(isSet(args['out']), 'Artifacts Output Directory (--out).');
+
+    const outputName = args['name'];
 
     const { contracts } = require(path.join(process.cwd(), args['in']));
 
     const contractNameFilter = [].concat(args['filter'] ?? []);
-    const ignorePaths = ['/test/', '/external-interfaces/', 'lib/', 'module/'];
-
-    const pathIgnored = (path) => ignorePaths.reduce((ignore, ignorePath) => path.includes(ignorePath) || ignore, false);
 
     const contractGroups = {};
 
-    Object.keys(contracts).filter((path) => !pathIgnored(path)).sort().forEach((path, index, paths) => {
+    Object.keys(contracts).forEach((path, index, paths) => {
         const name = Object.keys(contracts[path])[0];
 
         contractGroups[name] = {
@@ -140,13 +121,51 @@ module.exports = (args) => {
 
     const outputDirectory = path.join(process.cwd(), args['out']);
 
-    fsExtra.emptyDirSync(outputDirectory);
+    fsExtra.ensureDirSync(outputDirectory);
+
+    const mergedArtifact = {
+        abi: []
+    };
 
     Object.keys(contractGroups).forEach((contractName) => {
         if (contractNameFilter.length > 0 && !contractNameFilter.includes(contractName)) return;
 
-        const mergedArtifact = merge(contractGroups[contractName]);
-
-        fs.writeFileSync(path.join(outputDirectory, `${contractName}.json`), JSON.stringify(mergedArtifact, null, '    ').concat('\n'));
+        merge(mergedArtifact, contractGroups[contractName]);
     });
+
+    mergedArtifact.abi = mergedArtifact.abi.filter(({ type }) => type !== 'fallback');
+
+    mergedArtifact.abi.sort((a, b) => {
+        const aType = a.type;
+        const aName = a.name;
+        const aIsStateVariable = a.isStateVariable;
+
+        const bType = b.type;
+        const bName = b.name;
+        const bIsStateVariable = b.isStateVariable;
+
+        if (aType === 'constructor' && bType !== 'constructor') return -1;
+
+        if (aType !== 'constructor' && bType === 'constructor') return 1;
+
+        if (aType === 'event' && bType !== 'event') return -1;
+
+        if (aType !== 'event' && bType === 'event') return 1;
+
+        if (aType === 'event' && bType !== 'event') return -1;
+
+        if (aType !== 'event' && bType === 'event') return 1;
+
+        if (aName.toUpperCase() === aName && bName.toUpperCase() !== bName) return -1;
+
+        if (aName.toUpperCase() !== aName && bName.toUpperCase() === bName) return 1;
+
+        if (aIsStateVariable && !bIsStateVariable) return -1;
+
+        if (!aIsStateVariable && bIsStateVariable) return 1;
+
+        return aName.toUpperCase() < bName.toUpperCase() ? -1 : 1;
+    });
+
+    fs.writeFileSync(path.join(outputDirectory, `${outputName}.json`), JSON.stringify(mergedArtifact, null, '    ').concat('\n'));
 };
