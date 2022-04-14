@@ -1,6 +1,6 @@
 {
-    "name": "maple-tools",
-    "version": "0.2.0",
+    "name": "@maplelabs/maple-tools",
+    "version": "0.3.0",
     "description": "Various Maple Tools",
     "main": "bin/index.js",
     "repository": {
