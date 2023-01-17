@@ -14,7 +14,7 @@ module.exports = (args) => {
 
     const templatePath = isSet(args['templates'])
         ? path.join(process.cwd(), args['templates'], 'contract.hbs')
-        : './templates/contract.hbs'
+        : './templates/contract.hbs';
 
     const contractTemplate = fs.readFileSync(templatePath, { encoding: 'utf8' });
 
@@ -29,7 +29,7 @@ module.exports = (args) => {
     fileNames.forEach((fileName) => {
         if (!fileName.endsWith('.json')) return;
 
-        const { abi, metadata } = require(path.join(process.cwd(), args['in'], fileName));
+        const { abi, title: description } = require(path.join(process.cwd(), args['in'], fileName));
 
         if (!Array.isArray(abi)) return;
 
@@ -37,7 +37,6 @@ module.exports = (args) => {
         const functions = abi.filter(({ type }) => type === 'function');
         const constructor = abi.find(({ type }) => type === 'constructor');
         const contractName = fileName.slice(0, -5);
-        const description = extractTitle(metadata);
 
         const markdown = buildContractDoc({ contractName, description, constructor, functions, events });
 
