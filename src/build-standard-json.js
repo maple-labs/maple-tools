@@ -19,8 +19,11 @@ module.exports = (args) => {
         const sourceCode = fs.readFileSync(contactPath, { encoding: 'utf8' });
 
         base.sources = {};
-        base.sources[contractFileName] = { content: sourceCode.replace(/\n/g, "\n") };
+        base.sources[contractFileName] = { content: sourceCode.replace(/\n/g, '\n') };
 
-        fs.writeFileSync(path.join(process.cwd(), args['out'], `${contractFileName.split('.')[0]}.json`), JSON.stringify(base, null, '    ').concat('\n'));
+        fs.writeFileSync(
+            path.join(process.cwd(), args['out'], `${contractFileName.split('.')[0]}.json`),
+            JSON.stringify(base, null, '    ').concat('\n')
+        );
     });
 };

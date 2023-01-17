@@ -2,10 +2,11 @@ const fs = require('fs');
 const fsExtra = require('fs-extra');
 const assert = require('assert');
 const path = require('path');
+const _ = require('lodash');
 
 const isSet = (arg) => typeof arg === 'string' || typeof arg === 'number';
 
-const getDetailedAbiUnit = (abiUnit, devdocUnit = {}, stateVariableUnit) => {
+const getDetailedAbiUnit = (abiUnit, devdocUnit = {}) => {
     const enrichedAbiUnit = {
         type: abiUnit.type,
     };
@@ -17,12 +18,6 @@ const getDetailedAbiUnit = (abiUnit, devdocUnit = {}, stateVariableUnit) => {
     if (abiUnit.stateMutability) {
         Object.assign(enrichedAbiUnit, {
             stateMutability: abiUnit.stateMutability,
-        });
-    }
-
-    if (abiUnit.isStateVariable || stateVariableUnit) {
-        Object.assign(enrichedAbiUnit, {
-            isStateVariable: true,
         });
     }
 
@@ -52,7 +47,7 @@ const getDetailedAbiUnit = (abiUnit, devdocUnit = {}, stateVariableUnit) => {
         Object.assign(enrichedAbiUnit, { outputs });
     }
 
-    if (abiUnit.description || devdocUnit.details || stateVariableUnit?.details) {
+    if (abiUnit.description || devdocUnit.details) {
         Object.assign(enrichedAbiUnit, {
             description: devdocUnit.details ?? abiUnit.description,
         });
@@ -71,78 +66,45 @@ const findDevdocUnit = (abiUnit, devdoc = {}) => {
     return devdocSection[name];
 };
 
-const findStateVariableUnit = (abiUnit, devdoc = {}) => {
-    if (['constructor', 'event'].includes(abiUnit.type)) return;
-
-    return devdoc?.stateVariables?.[abiUnit.name];
-};
-
-const merge = (artifact, contractGroup) => {
-    const { contract = {}, interface = {} } = contractGroup;
-    const { abi: contractAbi = [], devdoc: contractDevdoc = {} } = contract;
-    const { abi: interfaceAbi = [], devdoc: interfaceDevdoc = {} } = interface;
-
-    artifact.abi = artifact.abi
-        .concat(interfaceAbi)
-        .concat(contractAbi)
-        .filter(({ name: a }, index, array) => array.findIndex(({ name: b }) => a === b) === index)
-        .map((abiUnit) =>
-            getDetailedAbiUnit(
-                getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, interfaceDevdoc), findStateVariableUnit(abiUnit, interfaceDevdoc)),
-                findDevdocUnit(abiUnit, contractDevdoc),
-                findStateVariableUnit(abiUnit, contractDevdoc)
-            )
-        );
-};
+const getDetailedAbi = (abi, devdoc) => abi.map((abiUnit) => getDetailedAbiUnit(abiUnit, findDevdocUnit(abiUnit, devdoc)));
 
 module.exports = (args) => {
     assert(isSet(args['name']), 'Contract Name (--name).');
-    assert(isSet(args['in']), 'Build Input File (--in).');
+    assert(isSet(args['in']), 'Build Input Directory (--in).');
     assert(isSet(args['out']), 'Artifacts Output Directory (--out).');
 
-    const outputName = args['name'];
-
-    const { contracts } = require(path.join(process.cwd(), args['in']));
-
-    const contractNameFilter = [].concat(args['filter'] ?? []);
-
-    const contractGroups = {};
-
-    Object.keys(contracts).forEach((path, index, paths) => {
-        const name = Object.keys(contracts[path])[0];
-
-        contractGroups[name] = {
-            contract: contracts[path][name],
-            interface: contracts[paths.find(path => Object.keys(contracts[path])[0] === `I${name}`)]?.[`I${name}`]
-        };
-
-        return contractGroups;
-    }, {});
-
+    const contractName = args['name'];
     const outputDirectory = path.join(process.cwd(), args['out']);
-
     fsExtra.ensureDirSync(outputDirectory);
 
-    const mergedArtifact = {
-        abi: []
-    };
+    const devdoc = [].concat(args['filter'] ?? []).reduce(
+        (devdoc, name) => {
+            const { rawMetadata } = require(path.join(process.cwd(), args['in'], `${name}.sol/${name}.json`));
+            const { events = {}, methods = {} } = JSON.parse(rawMetadata).output.devdoc;
 
-    Object.keys(contractGroups).forEach((contractName) => {
-        if (contractNameFilter.length > 0 && !contractNameFilter.includes(contractName)) return;
+            Object.keys(events).forEach((event) => {
+                devdoc.events[event] = _.merge(devdoc.events[event] ?? {}, events[event]);
+            });
 
-        merge(mergedArtifact, contractGroups[contractName]);
-    });
+            Object.keys(methods).forEach((method) => {
+                devdoc.methods[method] = _.merge(devdoc.methods[method] ?? {}, methods[method]);
+            });
 
-    mergedArtifact.abi = mergedArtifact.abi.filter(({ type }) => type !== 'fallback');
+            return devdoc;
+        },
+        { events: {}, methods: {} }
+    );
 
-    mergedArtifact.abi.sort((a, b) => {
+    const { abi, rawMetadata } = require(path.join(process.cwd(), args['in'], `${contractName}.sol/${contractName}.json`));
+
+    const detailedAbi = getDetailedAbi(abi, devdoc).filter(({ type }) => type !== 'fallback');
+
+    detailedAbi.sort((a, b) => {
         const aType = a.type;
         const aName = a.name;
-        const aIsStateVariable = a.isStateVariable;
 
         const bType = b.type;
         const bName = b.name;
-        const bIsStateVariable = b.isStateVariable;
 
         if (aType === 'constructor' && bType !== 'constructor') return -1;
 
@@ -160,12 +122,13 @@ module.exports = (args) => {
 
         if (aName.toUpperCase() !== aName && bName.toUpperCase() === bName) return 1;
 
-        if (aIsStateVariable && !bIsStateVariable) return -1;
-
-        if (!aIsStateVariable && bIsStateVariable) return 1;
-
         return aName.toUpperCase() < bName.toUpperCase() ? -1 : 1;
     });
 
-    fs.writeFileSync(path.join(outputDirectory, `${outputName}.json`), JSON.stringify(mergedArtifact, null, '    ').concat('\n'));
+    const artifact = {
+        abi: detailedAbi,
+        title: JSON.parse(rawMetadata).output.devdoc.title,
+    };
+
+    fs.writeFileSync(path.join(outputDirectory, `${contractName}.json`), JSON.stringify(artifact, null, '    ').concat('\n'));
 };
