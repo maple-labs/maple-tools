@@ -1,3 +1,7 @@
+/*
+ * This tool builds standard output JSONs to be used to verify contracts using multi-file methods. It may be outdated or not longer useful.
+ */
+
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const assert = require('assert');

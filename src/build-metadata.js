@@ -1,3 +1,8 @@
+/*
+ * This tool builds a new metadata file with additional information. It was helpful for V1 refactoring, when dapp-tools and libraries were
+ * used, and we wanted to compare bytecode and bytecode hash across cosmetic refactors.
+ */
+
 const fs = require('fs');
 const crypto = require('crypto');
 const assert = require('assert');
